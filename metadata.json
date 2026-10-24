@@ -1,0 +1,6 @@
+{
+  "name": "ChronoVault - Stealth Clock & App Hider",
+  "description": "A fully functional Time & Clock app equipped with a secure PIN vault to hide apps and private data from view.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
