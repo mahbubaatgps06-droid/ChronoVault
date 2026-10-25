@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { AppItem, VaultSettings, IntruderAttempt } from '../types';
 import { storage, SEED_INTRUDER_LOGS } from '../utils/storage';
 import { playSound, triggerHaptic } from '../utils/sound';
@@ -39,6 +39,9 @@ import {
   Upload,
   RotateCcw,
   CheckCircle2,
+  Download,
+  Copy,
+  Share2,
 } from 'lucide-react';
 
 interface Props {
@@ -60,9 +63,40 @@ export const VaultDashboard: React.FC<Props> = ({
   onLaunchApp,
   onOpenPhoneView,
 }) => {
-  const [activeTab, setActiveTab] = useState<'apps' | 'security' | 'logs'>('apps');
+  const [activeTab, setActiveTab] = useState<'apps' | 'security' | 'logs' | 'install'>('apps');
   const [filterMode, setFilterMode] = useState<'all' | 'hidden' | 'visible'>('all');
   const [search, setSearch] = useState('');
+
+  // PWA & APK install state
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
+  const [isCopied, setIsCopied] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        setDeferredInstallPrompt(null);
+      }
+    }
+  };
+
+  const handleCopyAppUrl = () => {
+    navigator.clipboard.writeText(window.location.origin);
+    setIsCopied(true);
+    playSound.keyPress();
+    triggerHaptic(15);
+    setTimeout(() => setIsCopied(false), 2500);
+  };
 
   // Add App Modal
   const [isAddingApp, setIsAddingApp] = useState(false);
@@ -345,6 +379,18 @@ export const VaultDashboard: React.FC<Props> = ({
         >
           <History className="w-3.5 h-3.5" />
           <span>Security Logs ({settings.intruderLogs.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('install')}
+          className={`flex items-center gap-1.5 py-2.5 px-3 text-xs font-medium border-b-2 transition-colors ${
+            activeTab === 'install'
+              ? 'border-purple-500 text-purple-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span>Android APK</span>
         </button>
       </div>
 
@@ -981,6 +1027,144 @@ export const VaultDashboard: React.FC<Props> = ({
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 4: Android APK & Installation Center */}
+      {activeTab === 'install' && (
+        <div className="flex-1 overflow-y-auto p-4 max-w-xl mx-auto w-full space-y-4">
+          {/* Header Card */}
+          <div className="p-4 bg-gradient-to-br from-purple-950/40 via-slate-900 to-slate-950 border border-purple-900/40 rounded-2xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-600/30 border border-purple-500/40 flex items-center justify-center text-purple-400 shrink-0">
+                <Smartphone className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white tracking-tight">
+                  Android Installation & APK Package
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Install ChronoVault directly onto your Android device as a standalone disguised Clock.
+                </p>
+              </div>
+            </div>
+
+            {/* Direct APK Download Button */}
+            <div className="mt-4 pt-4 border-t border-purple-900/30 flex flex-col sm:flex-row items-center gap-3">
+              <a
+                href="/chronovault.apk"
+                download="chronovault.apk"
+                className="w-full flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 font-semibold text-sm text-white shadow-lg shadow-purple-900/30 transition-all active:scale-[0.98]"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download ChronoVault.apk (7.2 MB)</span>
+              </a>
+
+              {deferredInstallPrompt && (
+                <button
+                  onClick={handleInstallPwa}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-750 font-medium text-xs text-slate-200 border border-slate-700 transition-all"
+                >
+                  <Smartphone className="w-4 h-4 text-emerald-400" />
+                  <span>1-Tap PWA Install</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 mt-3 text-[11px] text-slate-400">
+              <span className="flex items-center gap-1 text-emerald-400">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Direct Download Ready
+              </span>
+              <span>·</span>
+              <span>Android 8.0 - 15+</span>
+              <span>·</span>
+              <span>Offline Standalone</span>
+            </div>
+          </div>
+
+          {/* Sideloading Instructions */}
+          <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-2xl space-y-3">
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <Download className="w-3.5 h-3.5 text-purple-400" />
+              <span>How to Install the Standalone APK (.apk)</span>
+            </h4>
+
+            <ol className="space-y-2.5 text-xs text-slate-300">
+              <li className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full bg-purple-950 border border-purple-800 text-purple-300 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                  1
+                </span>
+                <span>
+                  Tap <strong>Download ChronoVault.apk</strong> above to save the package to your Android device.
+                </span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full bg-purple-950 border border-purple-800 text-purple-300 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                  2
+                </span>
+                <span>
+                  Open the downloaded file from your browser notification bar or via the <strong>Files / Downloads</strong> app.
+                </span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full bg-purple-950 border border-purple-800 text-purple-300 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                  3
+                </span>
+                <span>
+                  If prompted with <em>"For security, your phone is not allowed to install unknown apps"</em>, tap <strong>Settings</strong> and switch on <strong>Allow from this source</strong>.
+                </span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full bg-purple-950 border border-purple-800 text-purple-300 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                  4
+                </span>
+                <span>
+                  Tap <strong>Install</strong>. ChronoVault will be installed onto your home screen and app drawer disguised as an authentic system Clock!
+                </span>
+              </li>
+            </ol>
+          </div>
+
+          {/* WebAPK / Chrome 1-Tap Option */}
+          <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl space-y-2.5">
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Alternative: Android Chrome WebAPK (Zero Warnings)</span>
+            </h4>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              You can also install this web app directly into your Android OS using Chrome's WebAPK minting service. This generates an official Android app package signed by Google on your device with no unknown-sources warning:
+            </p>
+            <ol className="space-y-1.5 text-xs text-slate-300 list-decimal list-inside pl-1">
+              <li>Open this page in <strong>Google Chrome</strong> or <strong>Samsung Internet</strong> on your phone.</li>
+              <li>Tap the three dots menu (<strong>⋮</strong>) in the top-right corner.</li>
+              <li>Select <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li>
+              <li>Android will compile and install the Clock app into your native app list!</li>
+            </ol>
+          </div>
+
+          {/* Quick Share Link */}
+          <div className="p-3.5 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex items-center justify-between gap-3 text-xs">
+            <div className="min-w-0">
+              <span className="text-[11px] text-slate-400 block">Open on Android Device</span>
+              <span className="font-mono text-white text-xs truncate block">{window.location.origin}</span>
+            </div>
+            <button
+              onClick={handleCopyAppUrl}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium flex items-center gap-1.5 shrink-0 transition-colors"
+            >
+              {isCopied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Copy URL</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       )}
